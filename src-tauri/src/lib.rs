@@ -1,6 +1,10 @@
 mod commands;
 mod mistral_client;
 mod tray;
+pub mod cli;
+pub mod indexer;
+pub mod differ;
+pub mod agent;
 
 use tauri::{Manager, Listener};
 use tauri_plugin_store::StoreExt;

@@ -28,3 +28,11 @@ anyhow = "1.0"
 thiserror = "1.0"
 chrono = "0.4.42"
 
+# CLI Agent dependencies
+clap = { version = "4", features = ["derive"] }
+ignore = "0.4"
+similar = "2"
+colored = "2"
+indicatif = "0.17"
+walkdir = "2"
+regex = "1"
