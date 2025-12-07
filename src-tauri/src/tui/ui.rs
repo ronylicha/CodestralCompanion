@@ -52,7 +52,7 @@ fn draw_header(frame: &mut Frame, app: &App, area: Rect) {
         Line::from(vec![
             Span::styled("Codestral", Style::default().fg(MISTRAL_COLOR).add_modifier(Modifier::BOLD)),
             Span::raw(" Companion "),
-            Span::styled("v0.1.0", Style::default().fg(Color::DarkGray)),
+            Span::styled("v0.7.0-beta", Style::default().fg(Color::DarkGray)),
         ]),
         Line::from(""),
         Line::from(vec![

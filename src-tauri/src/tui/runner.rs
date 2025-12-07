@@ -157,8 +157,9 @@ impl TuiRunner {
                                 CommandAction::Resume => {
                                     // Show resume menu
                                     self.show_resume_menu(terminal).await?;
-                                    // Flush any residual events
-                                    while event::poll(Duration::from_millis(10)).unwrap_or(false) {
+                                    // Clear terminal and flush events
+                                    terminal.clear().map_err(|e| e.to_string())?;
+                                    while event::poll(Duration::from_millis(50)).unwrap_or(false) {
                                         let _ = event::read();
                                     }
                                 }
@@ -177,6 +178,11 @@ impl TuiRunner {
                                     self.open_memory_editor();
                                     enable_raw_mode().map_err(|e| e.to_string())?;
                                     execute!(terminal.backend_mut(), EnterAlternateScreen).map_err(|e| e.to_string())?;
+                                    terminal.clear().map_err(|e| e.to_string())?;
+                                    // Flush events
+                                    while event::poll(Duration::from_millis(10)).unwrap_or(false) {
+                                        let _ = event::read();
+                                    }
                                 }
                                 CommandAction::Questions => {
                                     // Demo tabbed form
@@ -199,8 +205,11 @@ impl TuiRunner {
                             KeyCode::Esc => {
                                 self.app.should_quit = true;
                             }
-                            // Alt+Shift cycles mode
-                            _ if key.modifiers.contains(KeyModifiers::ALT | KeyModifiers::SHIFT) => {
+                            // Tab with Alt+Shift cycles mode
+                            KeyCode::Tab if key.modifiers == (KeyModifiers::ALT | KeyModifiers::SHIFT) => {
+                                self.app.cycle_mode();
+                            }
+                            KeyCode::BackTab if key.modifiers.contains(KeyModifiers::ALT) => {
                                 self.app.cycle_mode();
                             }
                             KeyCode::Char('/') if self.app.input.is_empty() => {
@@ -369,11 +378,8 @@ Ces instructions sont lues avec chaque prompt pour ce projet.
             let _ = std::fs::write(&self.memory_file, template);
         }
         
-        // Leave TUI temporarily
-        let _ = disable_raw_mode();
-        let _ = execute!(io::stdout(), LeaveAlternateScreen);
-        
         // Open editor (try vim, then nano, then vi)
+        // Terminal state is managed by caller
         let editors = ["vim", "nvim", "nano", "vi"];
         for editor in editors {
             if Command::new(editor)
@@ -389,10 +395,6 @@ Ces instructions sont lues avec chaque prompt pour ce projet.
         if let Ok(content) = std::fs::read_to_string(&self.memory_file) {
             self.project_memory = content;
         }
-        
-        // Return to TUI
-        let _ = enable_raw_mode();
-        let _ = execute!(io::stdout(), crossterm::terminal::EnterAlternateScreen);
     }
 
     async fn show_resume_menu(&mut self, terminal: &mut Terminal<CrosstermBackend<io::Stdout>>) -> Result<(), String> {
