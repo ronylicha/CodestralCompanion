@@ -67,7 +67,8 @@ pub const COMMANDS: &[(&str, &str)] = &[
     ("plan", "Mode PLAN - Planification"),
     ("code", "Mode CODE - Modifications avec confirmation"),
     ("auto", "Mode AUTO - Application automatique"),
-    ("quit", "Quitter"),
+    ("exit", "Sauvegarder et quitter"),
+    ("quit", "Quitter sans sauvegarder"),
 ];
 
 pub struct TuiRunner {
@@ -158,6 +159,11 @@ impl TuiRunner {
                                 }
                                 CommandAction::Save => {
                                     self.save_conversation();
+                                }
+                                CommandAction::Exit => {
+                                    // Save and quit
+                                    self.save_conversation();
+                                    self.app.should_quit = true;
                                 }
                                 CommandAction::Memory => {
                                     // Exit TUI temporarily for editor
@@ -289,6 +295,7 @@ impl TuiRunner {
                 "resume" => Some(CommandAction::Resume),
                 "save" => Some(CommandAction::Save),
                 "memory" => Some(CommandAction::Memory),
+                "exit" => Some(CommandAction::Exit),
                 "ask" => { self.app.mode = ChatMode::Ask; None }
                 "plan" => { self.app.mode = ChatMode::Plan; None }
                 "code" => { self.app.mode = ChatMode::Code; None }
@@ -479,6 +486,7 @@ enum CommandAction {
     Resume,
     Save,
     Memory,
+    Exit,
 }
 
 impl TuiRunner {
