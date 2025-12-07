@@ -264,8 +264,43 @@ body {
   font-size: 0.95rem;
   font-family: inherit;
   resize: none;
-  min-height: 60px;
-  max-height: 150px;
+  min-height: 40px;
+  max-height: 200px;
+  overflow-y: auto;
+  transition: height 0.1s ease;
+}
+
+.large-paste-indicator {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  background: #e3f2fd;
+  border: 2px dashed #2196f3;
+  border-radius: 8px;
+}
+
+.paste-info {
+  flex: 1;
+  font-size: 0.95rem;
+  color: #1565c0;
+  font-weight: 500;
+}
+
+.btn-clear-paste {
+  background: transparent;
+  border: none;
+  color: #666;
+  font-size: 1.2rem;
+  cursor: pointer;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+}
+
+.btn-clear-paste:hover {
+  background: rgba(0, 0, 0, 0.1);
+  color: #333;
 }
 
 .chat-input:focus {

@@ -8,12 +8,17 @@ interface ChatWindowProps {
   onNewMessage: () => void;
 }
 
+const LARGE_PASTE_THRESHOLD = 500; // Characters threshold for large paste
+
 export function ChatWindow({ conversation, onNewMessage }: ChatWindowProps) {
   const [input, setInput] = useState("");
+  const [actualContent, setActualContent] = useState(""); // Full content for sending
+  const [isLargePaste, setIsLargePaste] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     if (conversation) {
@@ -26,15 +31,45 @@ export function ChatWindow({ conversation, onNewMessage }: ChatWindowProps) {
     scrollToBottom();
   }, [conversation?.messages]);
 
+  // Auto-resize textarea
+  useEffect(() => {
+    if (textareaRef.current && !isLargePaste) {
+      textareaRef.current.style.height = "auto";
+      textareaRef.current.style.height = Math.min(textareaRef.current.scrollHeight, 200) + "px";
+    }
+  }, [input, isLargePaste]);
+
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
-  const handleSend = async () => {
-    if (!conversation || !input.trim() || loading) return;
+  const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const value = e.target.value;
+    setActualContent(value);
 
-    const userMessage = input.trim();
+    // Check if it's a large paste (content significantly larger than before)
+    if (value.length > LARGE_PASTE_THRESHOLD && value.length - input.length > 100) {
+      setIsLargePaste(true);
+      setInput(`📋 ${value.length} caractères collés`);
+    } else if (!isLargePaste) {
+      setInput(value);
+    }
+  };
+
+  const handleClearLargePaste = () => {
+    setIsLargePaste(false);
     setInput("");
+    setActualContent("");
+  };
+
+  const handleSend = async () => {
+    const contentToSend = isLargePaste ? actualContent : input;
+    if (!conversation || !contentToSend.trim() || loading) return;
+
+    const userMessage = contentToSend.trim();
+    setInput("");
+    setActualContent("");
+    setIsLargePaste(false);
     setLoading(true);
     setError(null);
 
@@ -115,18 +150,26 @@ export function ChatWindow({ conversation, onNewMessage }: ChatWindowProps) {
       </div>
 
       <div className="chat-input-container">
-        <textarea
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={handleKeyPress}
-          placeholder="Tapez votre message... (Entrée pour envoyer, Shift+Entrée pour nouvelle ligne)"
-          className="chat-input"
-          rows={3}
-          disabled={loading}
-        />
+        {isLargePaste ? (
+          <div className="large-paste-indicator">
+            <span className="paste-info">{input}</span>
+            <button onClick={handleClearLargePaste} className="btn-clear-paste">✕</button>
+          </div>
+        ) : (
+          <textarea
+            ref={textareaRef}
+            value={input}
+            onChange={handleInputChange}
+            onKeyDown={handleKeyPress}
+            placeholder="Tapez votre message... (Entrée pour envoyer)"
+            className="chat-input"
+            rows={1}
+            disabled={loading}
+          />
+        )}
         <button
           onClick={handleSend}
-          disabled={!input.trim() || loading}
+          disabled={!(isLargePaste ? actualContent.trim() : input.trim()) || loading}
           className="btn-send"
         >
           Envoyer
@@ -135,4 +178,3 @@ export function ChatWindow({ conversation, onNewMessage }: ChatWindowProps) {
     </div>
   );
 }
-
