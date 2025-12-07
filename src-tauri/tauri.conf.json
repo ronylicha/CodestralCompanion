@@ -33,6 +33,14 @@
     "targets": [
       "deb"
     ],
+    "linux": {
+      "deb": {
+        "files": {
+          "/usr/share/doc/companion-chat/postinst": "deb/postinst",
+          "/usr/share/doc/companion-chat/prerm": "deb/prerm"
+        }
+      }
+    },
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",

@@ -198,42 +198,119 @@ impl Agent {
 
 /// Load API settings from store
 pub fn load_api_settings() -> Result<(String, ApiProvider), String> {
-    // Try to read from the store file in the app data directory
-    let config_dir = dirs::config_dir()
-        .ok_or("Cannot find config directory")?
+    // tauri-plugin-store saves to data_dir, not config_dir
+    let data_dir = dirs::data_dir()
+        .ok_or("Cannot find data directory")?
         .join("com.rony.companion-chat");
     
-    let settings_path = config_dir.join("settings.json");
+    let settings_path = data_dir.join("settings.json");
     
-    if !settings_path.exists() {
-        return Err("Paramètres API non configurés. Lancez d'abord l'application en mode GUI pour configurer votre clé API.".to_string());
+    // Try to load existing settings
+    if settings_path.exists() {
+        if let Ok(content) = fs::read_to_string(&settings_path) {
+            if let Ok(json) = serde_json::from_str::<serde_json::Value>(&content) {
+                if let Some(config) = json.get("config") {
+                    let api_key = config.get("api_key")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("")
+                        .to_string();
+                    
+                    if !api_key.is_empty() {
+                        let provider_str = config.get("provider")
+                            .and_then(|v| v.as_str())
+                            .unwrap_or("MistralAi");
+                        
+                        let provider = match provider_str {
+                            "Codestral" => ApiProvider::Codestral,
+                            _ => ApiProvider::MistralAi,
+                        };
+                        
+                        return Ok((api_key, provider));
+                    }
+                }
+            }
+        }
     }
-
-    let content = fs::read_to_string(&settings_path)
-        .map_err(|e| format!("Cannot read settings: {}", e))?;
     
-    let json: serde_json::Value = serde_json::from_str(&content)
-        .map_err(|e| format!("Invalid settings format: {}", e))?;
+    // No valid API key found - start setup wizard
+    setup_api_key_wizard(&data_dir, &settings_path)
+}
 
-    let config = json.get("config").ok_or("No config found in settings")?;
+/// Interactive API key setup wizard
+fn setup_api_key_wizard(config_dir: &std::path::Path, settings_path: &std::path::Path) -> Result<(String, ApiProvider), String> {
+    use std::io::{self, Write};
     
-    let api_key = config.get("api_key")
-        .and_then(|v| v.as_str())
-        .ok_or("API key not found")?
-        .to_string();
-
-    if api_key.is_empty() {
-        return Err("Clé API vide. Configurez-la dans l'application GUI.".to_string());
-    }
-
-    let provider_str = config.get("provider")
-        .and_then(|v| v.as_str())
-        .unwrap_or("MistralAi");
-
-    let provider = match provider_str {
-        "Codestral" => ApiProvider::Codestral,
-        _ => ApiProvider::MistralAi,
+    println!();
+    println!("{}", "╔══════════════════════════════════════════════════════════╗".cyan());
+    println!("{}", "║            🔑 Configuration de l'API                     ║".cyan());
+    println!("{}", "╚══════════════════════════════════════════════════════════╝".cyan());
+    println!();
+    
+    // Choose provider
+    println!("{}", "Choisissez votre endpoint:".bold());
+    println!("  {} Mistral AI (api.mistral.ai)", "[1]".cyan());
+    println!("  {} Codestral (codestral.mistral.ai)", "[2]".cyan());
+    println!();
+    
+    print!("{} ", "Votre choix [1/2]:".yellow());
+    io::stdout().flush().unwrap();
+    
+    let mut choice = String::new();
+    io::stdin().read_line(&mut choice).map_err(|e| e.to_string())?;
+    
+    let provider = match choice.trim() {
+        "2" => {
+            println!("{}", "→ Codestral sélectionné".green());
+            ApiProvider::Codestral
+        }
+        _ => {
+            println!("{}", "→ Mistral AI sélectionné".green());
+            ApiProvider::MistralAi
+        }
     };
-
+    
+    // Enter API key
+    println!();
+    println!("{}", "Entrez votre clé API:".bold());
+    println!("{}", "(Obtenez-la sur https://console.mistral.ai)".dimmed());
+    println!();
+    
+    print!("{} ", "Clé API:".yellow());
+    io::stdout().flush().unwrap();
+    
+    let mut api_key = String::new();
+    io::stdin().read_line(&mut api_key).map_err(|e| e.to_string())?;
+    let api_key = api_key.trim().to_string();
+    
+    if api_key.is_empty() {
+        return Err("Clé API vide. Annulé.".to_string());
+    }
+    
+    // Save settings
+    fs::create_dir_all(config_dir).map_err(|e| format!("Cannot create config dir: {}", e))?;
+    
+    let provider_str = match provider {
+        ApiProvider::Codestral => "Codestral",
+        ApiProvider::MistralAi => "MistralAi",
+    };
+    
+    let settings = serde_json::json!({
+        "config": {
+            "api_key": api_key,
+            "provider": provider_str
+        }
+    });
+    
+    let json = serde_json::to_string_pretty(&settings)
+        .map_err(|e| format!("Serialize error: {}", e))?;
+    
+    fs::write(settings_path, json)
+        .map_err(|e| format!("Write error: {}", e))?;
+    
+    println!();
+    println!("{}", "✅ Configuration sauvegardée!".green().bold());
+    println!();
+    
     Ok((api_key, provider))
 }
+

@@ -1,0 +1,5 @@
+#!/bin/bash
+# prerm script for companion-chat
+
+# Remove symlink
+rm -f /usr/bin/companion-chat-cli
