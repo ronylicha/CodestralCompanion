@@ -84,7 +84,7 @@ fn draw_chat(frame: &mut Frame, app: &App, area: Rect) {
             )),
             Line::from(""),
             Line::from(Span::styled(
-                "  Alt+M: changer de mode | /: commandes | ↑↓: historique",
+                "  Alt+Shift+Tab: mode | /: commandes | ↑↓: historique",
                 Style::default().fg(Color::DarkGray),
             )),
         ]);
@@ -207,7 +207,7 @@ fn draw_status_bar(frame: &mut Frame, app: &App, area: Rect) {
     let status = Line::from(vec![
         Span::styled(" -- ", Style::default().fg(Color::DarkGray)),
         Span::styled(mode_name, mode_style),
-        Span::styled(" [Alt+M] ", Style::default().fg(Color::DarkGray)),
+        Span::styled(" [Alt+⇧] ", Style::default().fg(Color::DarkGray)),
         Span::styled("│ ", Style::default().fg(Color::DarkGray)),
         Span::raw(format!("{} tok", app.tokens)),
         Span::styled(" │ ", Style::default().fg(Color::DarkGray)),

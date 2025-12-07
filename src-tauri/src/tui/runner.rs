@@ -156,6 +156,10 @@ impl TuiRunner {
                                 CommandAction::Resume => {
                                     // Show resume menu
                                     self.show_resume_menu(terminal).await?;
+                                    // Flush any residual events
+                                    while event::poll(Duration::from_millis(10)).unwrap_or(false) {
+                                        let _ = event::read();
+                                    }
                                 }
                                 CommandAction::Save => {
                                     self.save_conversation();
@@ -183,7 +187,7 @@ impl TuiRunner {
                             KeyCode::Esc => {
                                 self.app.should_quit = true;
                             }
-                            KeyCode::Char('m') if key.modifiers.contains(KeyModifiers::ALT) => {
+                            KeyCode::BackTab if key.modifiers.contains(KeyModifiers::ALT) => {
                                 self.app.cycle_mode();
                             }
                             KeyCode::Char('/') if self.app.input.is_empty() => {
