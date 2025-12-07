@@ -3,14 +3,14 @@
 
 use companion_chat_lib::cli::{parse_args, is_cli_mode, is_chat_mode, AgentConfig, ChatConfig};
 use companion_chat_lib::agent::{Agent, load_api_settings};
-use companion_chat_lib::chat::run_chat_session;
+use companion_chat_lib::tui::runner::run_tui;
 use colored::*;
 
 fn main() {
     let cli = parse_args();
     
     if is_chat_mode(&cli) {
-        // Interactive Chat Mode
+        // Interactive TUI Mode
         run_chat_mode(&cli);
     } else if is_cli_mode(&cli) {
         // CLI Agent Mode (single command)
@@ -32,7 +32,7 @@ fn run_chat_mode(cli: &companion_chat_lib::cli::Cli) {
 
     let runtime = tokio::runtime::Runtime::new().expect("Failed to create Tokio runtime");
     
-    if let Err(e) = runtime.block_on(run_chat_session(config)) {
+    if let Err(e) = runtime.block_on(run_tui(config.cwd)) {
         eprintln!("\n{} {}", "Erreur:".red().bold(), e);
         std::process::exit(1);
     }

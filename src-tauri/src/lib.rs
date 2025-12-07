@@ -7,6 +7,7 @@ pub mod differ;
 pub mod agent;
 pub mod chat;
 pub mod chat_storage;
+pub mod tui;
 
 use tauri::{Manager, Listener};
 use tauri_plugin_store::StoreExt;
