@@ -12,7 +12,7 @@ Application de bureau Ubuntu avec interface GUI et mode CLI/TUI pour interagir a
 - **Test** : `/questions` pour démontrer le formulaire
 
 ### Raccourcis mis à jour
-- **Alt+Shift+Tab** : Changer de mode (visible dans la barre de status)
+- **Alt+Shift** : Changer de mode (visible dans la barre de status)
 - **Barre de status** : `-- CODE [Alt+⇧] │ 1234 tok │ ~96% │ /: menu`
 
 ### Nouvelles commandes

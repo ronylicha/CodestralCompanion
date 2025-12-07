@@ -84,7 +84,7 @@ fn draw_chat(frame: &mut Frame, app: &App, area: Rect) {
             )),
             Line::from(""),
             Line::from(Span::styled(
-                "  Alt+Shift+Tab: mode | /: commandes | ↑↓: historique",
+                "  Alt+Shift: mode | /: commandes | ↑↓: historique",
                 Style::default().fg(Color::DarkGray),
             )),
         ]);

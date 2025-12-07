@@ -199,7 +199,8 @@ impl TuiRunner {
                             KeyCode::Esc => {
                                 self.app.should_quit = true;
                             }
-                            KeyCode::BackTab if key.modifiers.contains(KeyModifiers::ALT) => {
+                            // Alt+Shift cycles mode
+                            _ if key.modifiers.contains(KeyModifiers::ALT | KeyModifiers::SHIFT) => {
                                 self.app.cycle_mode();
                             }
                             KeyCode::Char('/') if self.app.input.is_empty() => {
