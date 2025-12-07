@@ -147,6 +147,15 @@ impl TuiRunner {
                     if self.show_command_menu {
                         if let Some(action) = self.handle_command_menu_key(key.code) {
                             match action {
+                                CommandAction::New => {
+                                    // Save current and start fresh
+                                    self.save_conversation();
+                                    self.app.messages.clear();
+                                }
+                                CommandAction::Resume => {
+                                    // Show resume menu
+                                    self.show_resume_menu(terminal).await?;
+                                }
                                 CommandAction::Save => {
                                     self.save_conversation();
                                 }
@@ -276,6 +285,8 @@ impl TuiRunner {
                     self.app.messages.clear();
                     None
                 }
+                "new" => Some(CommandAction::New),
+                "resume" => Some(CommandAction::Resume),
                 "save" => Some(CommandAction::Save),
                 "memory" => Some(CommandAction::Memory),
                 "ask" => { self.app.mode = ChatMode::Ask; None }
@@ -358,9 +369,114 @@ Ces instructions sont lues avec chaque prompt pour ce projet.
         let _ = enable_raw_mode();
         let _ = execute!(io::stdout(), crossterm::terminal::EnterAlternateScreen);
     }
+
+    async fn show_resume_menu(&mut self, terminal: &mut Terminal<CrosstermBackend<io::Stdout>>) -> Result<(), String> {
+        use crate::chat_storage::ChatStorage;
+        use ratatui::layout::{Constraint, Direction, Layout, Rect};
+        use ratatui::style::{Color, Modifier, Style};
+        use ratatui::text::{Line, Span};
+        use ratatui::widgets::{Block, Borders, Clear, List, ListItem};
+        
+        let storage = ChatStorage::new()?;
+        let chats = storage.list()?;
+        
+        if chats.is_empty() {
+            self.app.add_ai_message("📭 Aucune conversation sauvegardée".to_string());
+            return Ok(());
+        }
+        
+        let mut selected: usize = 0;
+        
+        loop {
+            terminal.draw(|frame| {
+                // Draw normal UI
+                ui::draw(frame, &self.app);
+                
+                // Draw overlay menu
+                let area = frame.area();
+                let menu_width = 60.min(area.width.saturating_sub(4));
+                let menu_height = (chats.len() + 2).min(15) as u16;
+                
+                let menu_area = Rect {
+                    x: (area.width - menu_width) / 2,
+                    y: (area.height - menu_height) / 2,
+                    width: menu_width,
+                    height: menu_height,
+                };
+                
+                frame.render_widget(Clear, menu_area);
+                
+                let block = Block::default()
+                    .title(" Reprendre une conversation ")
+                    .borders(Borders::ALL)
+                    .border_style(Style::default().fg(Color::Cyan));
+                
+                let inner = block.inner(menu_area);
+                frame.render_widget(block, menu_area);
+                
+                let items: Vec<ListItem> = chats.iter()
+                    .enumerate()
+                    .map(|(i, chat)| {
+                        let style = if i == selected {
+                            Style::default().bg(Color::Rgb(60, 60, 100)).add_modifier(Modifier::BOLD)
+                        } else {
+                            Style::default()
+                        };
+                        let prefix = if i == selected { "▶ " } else { "  " };
+                        ListItem::new(Line::from(vec![
+                            Span::raw(prefix),
+                            Span::styled(&chat.title, style),
+                            Span::styled(format!(" ({})", chat.time_ago()), Style::default().fg(Color::DarkGray)),
+                        ]))
+                    })
+                    .collect();
+                
+                let list = List::new(items);
+                frame.render_widget(list, inner);
+            }).map_err(|e| e.to_string())?;
+            
+            if event::poll(Duration::from_millis(100)).map_err(|e| e.to_string())? {
+                if let Event::Key(key) = event::read().map_err(|e| e.to_string())? {
+                    match key.code {
+                        KeyCode::Esc => break,
+                        KeyCode::Up => {
+                            if selected > 0 {
+                                selected -= 1;
+                            }
+                        }
+                        KeyCode::Down => {
+                            if selected < chats.len().saturating_sub(1) {
+                                selected += 1;
+                            }
+                        }
+                        KeyCode::Enter => {
+                            // Load selected chat
+                            if let Some(chat) = chats.get(selected) {
+                                self.app.messages.clear();
+                                for msg in &chat.messages {
+                                    self.app.messages.push(crate::tui::app::ChatMessage {
+                                        role: msg.role.clone(),
+                                        content: msg.content.clone(),
+                                        is_user: msg.role == "user",
+                                    });
+                                }
+                                self.app.scroll = u16::MAX;
+                            }
+                            break;
+                        }
+                        _ => {}
+                    }
+                }
+            }
+        }
+        
+        Ok(())
+    }
 }
 
 enum CommandAction {
+    New,
+    Resume,
     Save,
     Memory,
 }
