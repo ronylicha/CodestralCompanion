@@ -183,7 +183,7 @@ impl TuiRunner {
                             KeyCode::Esc => {
                                 self.app.should_quit = true;
                             }
-                            KeyCode::BackTab => {
+                            KeyCode::Char('m') if key.modifiers.contains(KeyModifiers::ALT) => {
                                 self.app.cycle_mode();
                             }
                             KeyCode::Char('/') if self.app.input.is_empty() => {
