@@ -722,17 +722,30 @@ impl TuiRunner {
         
         frame.render_widget(filter_para, menu_layout[0]);
 
-        // Command list
+        // Command list with scroll
         let filtered = self.filtered_commands();
+        let visible_height = menu_layout[1].height as usize;
+        
+        // Calculate scroll offset to keep selected item visible
+        let scroll_offset = if self.selected_command >= visible_height {
+            self.selected_command - visible_height + 1
+        } else {
+            0
+        };
+        
         let items: Vec<ListItem> = filtered.iter()
             .enumerate()
+            .skip(scroll_offset)
+            .take(visible_height)
             .map(|(i, (cmd, desc))| {
                 let style = if i == self.selected_command {
                     Style::default().bg(Color::Rgb(60, 60, 100)).add_modifier(Modifier::BOLD)
                 } else {
                     Style::default()
                 };
+                let prefix = if i == self.selected_command { "▶ " } else { "  " };
                 ListItem::new(Line::from(vec![
+                    Span::raw(prefix),
                     Span::styled(format!("/{:<10}", cmd), Style::default().fg(Color::Cyan)),
                     Span::styled(format!(" {}", desc), style),
                 ]))
