@@ -61,6 +61,7 @@ pub const COMMANDS: &[(&str, &str)] = &[
     ("resume", "Reprendre une conversation"),
     ("save", "Sauvegarder la conversation"),
     ("memory", "Éditer les instructions projet (vim)"),
+    ("questions", "Test formulaire tabbé"),
     ("clear", "Effacer l'historique"),
     ("reindex", "Réindexer le projet"),
     ("ask", "Mode ASK - Questions simples"),
@@ -176,6 +177,17 @@ impl TuiRunner {
                                     self.open_memory_editor();
                                     enable_raw_mode().map_err(|e| e.to_string())?;
                                     execute!(terminal.backend_mut(), EnterAlternateScreen).map_err(|e| e.to_string())?;
+                                }
+                                CommandAction::Questions => {
+                                    // Demo tabbed form
+                                    let questions = vec![
+                                        "Quel est le nom du projet?".to_string(),
+                                        "Quel langage utilisez-vous?".to_string(),
+                                        "Décrivez le problème à résoudre:".to_string(),
+                                    ];
+                                    if let Ok(Some(response)) = self.show_question_form(questions, terminal).await {
+                                        self.app.add_user_message(response);
+                                    }
                                 }
                             }
                         }
@@ -299,6 +311,7 @@ impl TuiRunner {
                 "resume" => Some(CommandAction::Resume),
                 "save" => Some(CommandAction::Save),
                 "memory" => Some(CommandAction::Memory),
+                "questions" => Some(CommandAction::Questions),
                 "exit" => Some(CommandAction::Exit),
                 "ask" => { self.app.mode = ChatMode::Ask; None }
                 "plan" => { self.app.mode = ChatMode::Plan; None }
@@ -490,7 +503,174 @@ enum CommandAction {
     Resume,
     Save,
     Memory,
+    Questions,
     Exit,
+}
+
+/// Multi-question form with Tab navigation
+pub struct QuestionForm {
+    pub questions: Vec<String>,
+    pub answers: Vec<String>,
+    pub current_field: usize,
+    pub cursor_pos: usize,
+}
+
+impl QuestionForm {
+    pub fn new(questions: Vec<String>) -> Self {
+        let count = questions.len();
+        Self {
+            questions,
+            answers: vec![String::new(); count],
+            current_field: 0,
+            cursor_pos: 0,
+        }
+    }
+
+    pub fn next_field(&mut self) {
+        if self.current_field < self.questions.len() - 1 {
+            self.current_field += 1;
+            self.cursor_pos = self.answers[self.current_field].len();
+        }
+    }
+
+    pub fn prev_field(&mut self) {
+        if self.current_field > 0 {
+            self.current_field -= 1;
+            self.cursor_pos = self.answers[self.current_field].len();
+        }
+    }
+
+    pub fn insert_char(&mut self, c: char) {
+        self.answers[self.current_field].insert(self.cursor_pos, c);
+        self.cursor_pos += 1;
+    }
+
+    pub fn delete_char(&mut self) {
+        if self.cursor_pos > 0 {
+            self.cursor_pos -= 1;
+            self.answers[self.current_field].remove(self.cursor_pos);
+        }
+    }
+
+    pub fn format_responses(&self) -> String {
+        self.questions.iter()
+            .zip(self.answers.iter())
+            .map(|(q, a)| format!("**{}**\n{}", q, a))
+            .collect::<Vec<_>>()
+            .join("\n\n")
+    }
+}
+
+impl TuiRunner {
+    /// Show a tabbed form for multiple questions
+    pub async fn show_question_form(&mut self, questions: Vec<String>, terminal: &mut Terminal<CrosstermBackend<io::Stdout>>) -> Result<Option<String>, String> {
+        use ratatui::layout::{Constraint, Direction, Layout, Rect};
+        use ratatui::style::{Color, Modifier, Style};
+        use ratatui::text::{Line, Span};
+        use ratatui::widgets::{Block, Borders, Clear, Paragraph};
+
+        let mut form = QuestionForm::new(questions);
+
+        loop {
+            terminal.draw(|frame| {
+                // Draw normal UI behind
+                ui::draw(frame, &self.app);
+
+                // Draw form overlay
+                let area = frame.area();
+                let form_width = 70.min(area.width.saturating_sub(4));
+                let form_height = ((form.questions.len() * 3) + 4).min(20) as u16;
+
+                let form_area = Rect {
+                    x: (area.width - form_width) / 2,
+                    y: (area.height - form_height) / 2,
+                    width: form_width,
+                    height: form_height,
+                };
+
+                frame.render_widget(Clear, form_area);
+
+                let block = Block::default()
+                    .title(" Questions (Tab: suivant, Shift+Tab: précédent, Enter: valider) ")
+                    .borders(Borders::ALL)
+                    .border_style(Style::default().fg(Color::Cyan));
+
+                let inner = block.inner(form_area);
+                frame.render_widget(block, form_area);
+
+                // Draw each question/answer field
+                let field_height = 3u16;
+                for (i, (question, answer)) in form.questions.iter().zip(form.answers.iter()).enumerate() {
+                    let y = inner.y + (i as u16 * field_height);
+                    if y + field_height > inner.y + inner.height {
+                        break;
+                    }
+
+                    let is_current = i == form.current_field;
+                    let border_color = if is_current { Color::Yellow } else { Color::DarkGray };
+
+                    let field_area = Rect {
+                        x: inner.x,
+                        y,
+                        width: inner.width,
+                        height: field_height,
+                    };
+
+                    let field_block = Block::default()
+                        .title(format!(" {} ({}/{}) ", question, i + 1, form.questions.len()))
+                        .borders(Borders::ALL)
+                        .border_style(Style::default().fg(border_color));
+
+                    let field_inner = field_block.inner(field_area);
+                    frame.render_widget(field_block, field_area);
+
+                    // Draw answer with cursor if current
+                    let text = if is_current {
+                        let before = &answer[..form.cursor_pos.min(answer.len())];
+                        let cursor = answer.get(form.cursor_pos..form.cursor_pos + 1).unwrap_or(" ");
+                        let after = &answer[form.cursor_pos.saturating_add(1).min(answer.len())..];
+                        Line::from(vec![
+                            Span::raw(before),
+                            Span::styled(cursor, Style::default().bg(Color::White).fg(Color::Black)),
+                            Span::raw(after),
+                        ])
+                    } else {
+                        Line::from(answer.as_str())
+                    };
+
+                    let para = Paragraph::new(text);
+                    frame.render_widget(para, field_inner);
+                }
+            }).map_err(|e| e.to_string())?;
+
+            if event::poll(Duration::from_millis(100)).map_err(|e| e.to_string())? {
+                if let Event::Key(key) = event::read().map_err(|e| e.to_string())? {
+                    match key.code {
+                        KeyCode::Esc => return Ok(None),
+                        KeyCode::Enter => {
+                            // Submit all answers
+                            return Ok(Some(form.format_responses()));
+                        }
+                        KeyCode::Tab => form.next_field(),
+                        KeyCode::BackTab => form.prev_field(),
+                        KeyCode::Char(c) => form.insert_char(c),
+                        KeyCode::Backspace => form.delete_char(),
+                        KeyCode::Left => {
+                            if form.cursor_pos > 0 {
+                                form.cursor_pos -= 1;
+                            }
+                        }
+                        KeyCode::Right => {
+                            if form.cursor_pos < form.answers[form.current_field].len() {
+                                form.cursor_pos += 1;
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+            }
+        }
+    }
 }
 
 impl TuiRunner {
