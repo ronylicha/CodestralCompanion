@@ -1,19 +1,40 @@
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-use companion_chat_lib::cli::{parse_args, is_cli_mode, AgentConfig};
+use companion_chat_lib::cli::{parse_args, is_cli_mode, is_chat_mode, AgentConfig, ChatConfig};
 use companion_chat_lib::agent::{Agent, load_api_settings};
+use companion_chat_lib::chat::run_chat_session;
 use colored::*;
 
 fn main() {
     let cli = parse_args();
     
-    if is_cli_mode(&cli) {
-        // CLI Agent Mode
+    if is_chat_mode(&cli) {
+        // Interactive Chat Mode
+        run_chat_mode(&cli);
+    } else if is_cli_mode(&cli) {
+        // CLI Agent Mode (single command)
         run_cli_agent(&cli);
     } else {
         // GUI Mode
         companion_chat_lib::run()
+    }
+}
+
+fn run_chat_mode(cli: &companion_chat_lib::cli::Cli) {
+    let config = match ChatConfig::from_cli(cli) {
+        Some(c) => c,
+        None => {
+            eprintln!("{}", "Erreur: Configuration invalide".red());
+            std::process::exit(1);
+        }
+    };
+
+    let runtime = tokio::runtime::Runtime::new().expect("Failed to create Tokio runtime");
+    
+    if let Err(e) = runtime.block_on(run_chat_session(config)) {
+        eprintln!("\n{} {}", "Erreur:".red().bold(), e);
+        std::process::exit(1);
     }
 }
 

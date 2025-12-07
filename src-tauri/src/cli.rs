@@ -86,9 +86,28 @@ pub enum Commands {
         #[arg(long, default_value = "50")]
         max_files: usize,
         
-        /// Dry run - show what would be done without making changes
+    /// Dry run - show what would be done without making changes
         #[arg(long)]
         dry_run: bool,
+    },
+    
+    /// Interactive chat mode: REPL-like interface for continuous interaction
+    Chat {
+        /// Working directory (defaults to current directory)
+        #[arg(long, short = 'c')]
+        cwd: Option<PathBuf>,
+        
+        /// File extensions to include
+        #[arg(long, short = 'e')]
+        include: Option<String>,
+        
+        /// Directories to exclude
+        #[arg(long, short = 'x')]
+        exclude: Option<Vec<String>>,
+        
+        /// Maximum files to analyze
+        #[arg(long, default_value = "50")]
+        max_files: usize,
     },
     
     /// Start the GUI application (default if no command given)
@@ -148,7 +167,7 @@ impl AgentConfig {
                     dry_run: *dry_run,
                 })
             }
-            Some(Commands::Gui) | None => None,
+            Some(Commands::Gui) | Some(Commands::Chat { .. }) | None => None,
         }
     }
 }
@@ -159,4 +178,32 @@ pub fn parse_args() -> Cli {
 
 pub fn is_cli_mode(cli: &Cli) -> bool {
     matches!(cli.command, Some(Commands::Plan { .. }) | Some(Commands::Interactive { .. }) | Some(Commands::Auto { .. }))
+}
+
+pub fn is_chat_mode(cli: &Cli) -> bool {
+    matches!(cli.command, Some(Commands::Chat { .. }))
+}
+
+pub struct ChatConfig {
+    pub cwd: PathBuf,
+    pub include_extensions: Option<Vec<String>>,
+    pub exclude_dirs: Vec<String>,
+    pub max_files: usize,
+}
+
+impl ChatConfig {
+    pub fn from_cli(cli: &Cli) -> Option<Self> {
+        match &cli.command {
+            Some(Commands::Chat { cwd, include, exclude, max_files }) => {
+                let working_dir = cwd.clone().unwrap_or_else(|| std::env::current_dir().unwrap_or_default());
+                Some(ChatConfig {
+                    cwd: working_dir,
+                    include_extensions: include.as_ref().map(|s| s.split(',').map(|x| x.trim().to_string()).collect()),
+                    exclude_dirs: exclude.clone().unwrap_or_default(),
+                    max_files: *max_files,
+                })
+            }
+            _ => None,
+        }
+    }
 }
