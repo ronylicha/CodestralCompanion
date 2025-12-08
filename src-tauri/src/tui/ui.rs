@@ -14,14 +14,26 @@ const MAX_TOKENS: usize = 32000;
 pub fn draw(frame: &mut Frame, app: &App) {
     let size = frame.area();
     
+    // Calculate input height based on content (wrap text)
+    // Account for borders (2) and "> " prefix (2)
+    let available_width = size.width.saturating_sub(6) as usize;
+    let input_len = app.input.chars().count() + 2; // +2 for "> " prefix
+    let input_lines = if available_width > 0 && input_len > 0 {
+        ((input_len + available_width - 1) / available_width).max(1)
+    } else {
+        1
+    };
+    // Minimum 3, maximum 10 lines for input area (add 2 for borders)
+    let input_height = (input_lines as u16 + 2).clamp(3, 10);
+    
     // Main layout: Header | Chat | Input | Status
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Length(5),  // Header
-            Constraint::Min(10),    // Chat area
-            Constraint::Length(3),  // Input
-            Constraint::Length(1),  // Status bar
+            Constraint::Length(5),           // Header
+            Constraint::Min(10),             // Chat area
+            Constraint::Length(input_height), // Input (dynamic)
+            Constraint::Length(1),           // Status bar
         ])
         .split(size);
 
@@ -133,24 +145,44 @@ fn draw_chat(frame: &mut Frame, app: &App, area: Rect) {
         items.push(ListItem::new(Line::from("")));
     }
 
-    // Loading indicator
+    // Loading indicator with animation
     if app.loading {
+        const SPINNER_FRAMES: &[&str] = &["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
+        const PULSE_COLORS: &[Color] = &[
+            Color::Yellow,
+            Color::Rgb(255, 200, 50),
+            Color::Rgb(255, 180, 0),
+            Color::Rgb(255, 200, 50),
+        ];
+        
+        let frame = app.spinner_frame % SPINNER_FRAMES.len();
+        let color_idx = (app.spinner_frame / 2) % PULSE_COLORS.len();
+        let spinner = SPINNER_FRAMES[frame];
+        let color = PULSE_COLORS[color_idx];
+        
         items.push(ListItem::new(Line::from(vec![
-            Span::styled("● ", Style::default().fg(Color::Yellow)),
-            Span::styled("Réflexion en cours...", Style::default().fg(Color::Yellow).add_modifier(Modifier::ITALIC)),
+            Span::styled(format!("{} ", spinner), Style::default().fg(color).add_modifier(Modifier::BOLD)),
+            Span::styled("Réflexion en cours", Style::default().fg(color).add_modifier(Modifier::ITALIC)),
+            Span::styled("...", Style::default().fg(Color::DarkGray)),
         ])));
     }
 
-    // Calculate scroll
+    // Calculate scroll - scroll represents lines scrolled UP from bottom
+    // 0 = at bottom, higher = scrolled up more
     let total_items = items.len();
     let visible_height = inner.height as usize;
-    let scroll_offset = if total_items > visible_height {
-        (total_items - visible_height).min(app.scroll as usize)
-    } else {
-        0
-    };
+    let max_scroll = total_items.saturating_sub(visible_height);
+    let scroll_from_top = max_scroll.saturating_sub(app.scroll as usize);
+    let scroll_offset = scroll_from_top;
 
-    let list = List::new(items);
+    // Apply scroll by taking only visible items from the scroll offset
+    let visible_items: Vec<ListItem> = items
+        .into_iter()
+        .skip(scroll_offset)
+        .take(visible_height)
+        .collect();
+
+    let list = List::new(visible_items);
     frame.render_widget(list, inner);
 
     // Scrollbar
@@ -171,19 +203,26 @@ fn draw_input(frame: &mut Frame, app: &App, area: Rect) {
     let input_area = input_block.inner(area);
     frame.render_widget(input_block, area);
 
-    // Build input text with cursor
-    let before_cursor = &app.input[..app.cursor_pos];
-    let cursor_char = app.input.get(app.cursor_pos..app.cursor_pos + 1).unwrap_or(" ");
-    let after_cursor = &app.input[app.cursor_pos.saturating_add(1).min(app.input.len())..];
+    // Build input text with cursor - handle UTF-8 properly
+    // cursor_pos is a character index, not a byte index
+    let chars: Vec<char> = app.input.chars().collect();
+    
+    let before_cursor: String = chars[..app.cursor_pos.min(chars.len())].iter().collect();
+    let cursor_char: String = chars.get(app.cursor_pos).map(|c| c.to_string()).unwrap_or_else(|| " ".to_string());
+    let after_cursor: String = if app.cursor_pos + 1 < chars.len() {
+        chars[app.cursor_pos + 1..].iter().collect()
+    } else {
+        String::new()
+    };
 
-    let input_line = Line::from(vec![
+    let input_text = Text::from(Line::from(vec![
         Span::raw("> "),
         Span::raw(before_cursor),
         Span::styled(cursor_char, Style::default().bg(Color::White).fg(Color::Black)),
         Span::raw(after_cursor),
-    ]);
+    ]));
 
-    let input = Paragraph::new(input_line);
+    let input = Paragraph::new(input_text).wrap(Wrap { trim: false });
     frame.render_widget(input, input_area);
 }
 

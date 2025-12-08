@@ -1,60 +1,64 @@
-# Codestral Companion v0.7.0-beta
+# Codestral Companion v0.9.0-beta
 
 Application de bureau Ubuntu avec interface GUI et mode CLI/TUI pour interagir avec Mistral AI / Codestral.
 
-## 🚀 Nouveautés v0.7.0-beta
+## 🚀 Nouveautés v0.9.0-beta
 
-### Formulaire Tabbé
-- **Formulaire multi-questions** : Quand plusieurs questions sont posées, affiche un formulaire tabbé
-- **Navigation** : Tab / Shift+Tab entre les champs
-- **Curseur** : ← → pour naviguer dans le champ actuel
-- **Validation** : Enter pour soumettre toutes les réponses
-- **Test** : `/questions` pour démontrer le formulaire
+### 🤖 Outils AI (Agent Mode)
+- **read_file** : L'AI peut lire les fichiers du projet
+- **write_file** : L'AI peut créer/modifier des fichiers
+- **execute_bash** : L'AI exécute des commandes shell
+- **list_directory** : L'AI liste les répertoires
+- **search_in_files** : L'AI recherche dans les fichiers
+- **Sécurité** : Commandes dangereuses (`rm`, `sudo`) demandent confirmation
 
-### Raccourcis mis à jour
-- **Alt+Shift** : Changer de mode (visible dans la barre de status)
-- **Barre de status** : `-- CODE [Alt+⇧] │ 1234 tok │ ~96% │ /: menu`
+### 🔌 Support MCP (Model Context Protocol)
+- **Serveurs MCP** : Intégration de serveurs externes (Context7, WebSearch, etc.)
+- **Config standard** : `.codestral/mcp_servers.json`
+- **Outils dynamiques** : Les outils MCP sont découverts automatiquement
 
-### Nouvelles commandes
-- `/exit` : Sauvegarder et quitter
-- `/questions` : Tester le formulaire tabbé
-
-### Mode CLI / TUI
-- **Interface TUI complète** avec ratatui
-- **4 modes** : ASK, PLAN, CODE, AUTO
-- **Mode AUTO** : Continue jusqu'à [TERMINÉ]
-- **Auto-compaction** : À 90% du contexte
-- **Menu `/`** : Toutes les commandes
-- **Mémoire projet** : `.codestral/memory.md` (créé automatiquement avec template)
-
-### Interface GUI
-- Bouton copier 📋 sur les blocs de code
-- Zone de texte auto-expansible
-- Gros collages affichés en résumé
+### ⚡ Améliorations
+- **Retry API** : 4 tentatives avec backoff exponentiel (1s, 2s, 4s)
+- **Spinner animé** : Indicateur de réflexion qui pulse
 
 ## Installation
 
 ```bash
-sudo dpkg -i "Companion Chat_0.7.0-beta_amd64.deb"
+sudo dpkg -i "Companion Chat_0.9.0-beta_amd64.deb"
+sudo ln -sf /usr/bin/companion-chat /usr/bin/companion-chat-cli
+```
+
+## Configuration MCP
+
+Créer `.codestral/mcp_servers.json` dans votre projet :
+```json
+{
+  "mcpServers": {
+    "context7": {
+      "command": "npx",
+      "args": ["-y", "@upstash/context7-mcp"]
+    }
+  }
+}
 ```
 
 ## Commandes
 
 ```bash
 companion-chat          # Mode GUI
-companion-chat chat     # Mode TUI
-companion-chat chat -c /projet
+companion-chat-cli      # Mode TUI (auto-détecté)
+companion-chat-cli chat -c /projet
 ```
 
 ## Raccourcis TUI
 
 | Touche | Action |
 |--------|--------|
-| Alt+Shift+Tab | Cycler les modes |
+| Shift+Tab ou Alt+M | Cycler les modes |
 | `/` | Menu commandes |
-| Tab / Shift+Tab | Navigation formulaire |
-| ↑↓ | Historique / Scroll |
-| Enter | Envoyer / Valider |
+| PageUp/PageDown | Scroll chat |
+| ↑↓ | Historique input |
+| Enter | Envoyer |
 | Ctrl+C / Esc | Quitter |
 
 ## Commandes disponibles
@@ -63,12 +67,26 @@ companion-chat chat -c /projet
 |----------|-------------|
 | `/new` | Nouvelle conversation |
 | `/resume` | Reprendre une conversation |
-| `/save` | Sauvegarder |
+| `/reindex` | Réindexer le projet (SQLite) |
 | `/memory` | Éditer instructions projet |
-| `/questions` | Test formulaire tabbé |
 | `/exit` | Sauvegarder et quitter |
-| `/quit` | Quitter sans sauvegarder |
-| `/ask`, `/plan`, `/code`, `/auto` | Changer de mode |
+
+## Historique des versions
+
+### v0.8.0-beta
+- Affichage instantané des messages
+- Index SQLite avec barre de progression
+- Navigation PageUp/PageDown
+- Formulaire tabbé avec choix prédéfinis
+
+### v0.7.0-beta
+- Interface TUI complète avec ratatui
+- 4 modes : ASK, PLAN, CODE, AUTO
+- Auto-compaction à 90% du contexte
+
+### v0.6.0-beta
+- Interface GUI avec system tray
+- Support Mistral AI / Codestral
 
 ## Licence
 

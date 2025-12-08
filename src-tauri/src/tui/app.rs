@@ -20,6 +20,10 @@ pub struct App {
     pub tokens: usize,
     /// Is waiting for AI response
     pub loading: bool,
+    /// Spinner animation frame
+    pub spinner_frame: usize,
+    /// Pending questions from AI (to show in tabbed form)
+    pub pending_questions: Vec<String>,
     /// Should quit
     pub should_quit: bool,
     /// Input history for up/down navigation
@@ -45,6 +49,8 @@ impl App {
             scroll: 0,
             tokens: 0,
             loading: false,
+            spinner_frame: 0,
+            pending_questions: Vec::new(),
             should_quit: false,
             input_history: Vec::new(),
             history_index: None,
@@ -89,32 +95,46 @@ impl App {
     }
 
     pub fn scroll_up(&mut self) {
-        self.scroll = self.scroll.saturating_sub(1);
-    }
-
-    pub fn scroll_down(&mut self) {
+        // Scroll up = increase offset from bottom
         self.scroll = self.scroll.saturating_add(1);
     }
 
+    pub fn scroll_down(&mut self) {
+        // Scroll down = decrease offset from bottom (back toward latest messages)
+        self.scroll = self.scroll.saturating_sub(1);
+    }
+
     pub fn move_cursor_left(&mut self) {
-        self.cursor_pos = self.cursor_pos.saturating_sub(1);
+        if self.cursor_pos > 0 {
+            self.cursor_pos -= 1;
+        }
     }
 
     pub fn move_cursor_right(&mut self) {
-        if self.cursor_pos < self.input.len() {
+        if self.cursor_pos < self.input.chars().count() {
             self.cursor_pos += 1;
         }
     }
 
     pub fn insert_char(&mut self, c: char) {
-        self.input.insert(self.cursor_pos, c);
+        // Convert char index to byte index for insertion
+        let byte_pos = self.input.char_indices()
+            .nth(self.cursor_pos)
+            .map(|(i, _)| i)
+            .unwrap_or(self.input.len());
+        self.input.insert(byte_pos, c);
         self.cursor_pos += 1;
     }
 
     pub fn delete_char(&mut self) {
-        if self.cursor_pos > 0 {
+        if self.cursor_pos > 0 && !self.input.is_empty() {
             self.cursor_pos -= 1;
-            self.input.remove(self.cursor_pos);
+            // Convert char index to byte index for removal
+            if let Some((byte_pos, _)) = self.input.char_indices().nth(self.cursor_pos) {
+                if byte_pos < self.input.len() {
+                    self.input.remove(byte_pos);
+                }
+            }
         }
     }
 

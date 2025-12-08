@@ -9,12 +9,20 @@ use colored::*;
 fn main() {
     let cli = parse_args();
     
+    // Check if invoked as companion-chat-cli (launched via symlink)
+    let is_cli_binary = std::env::args().next()
+        .map(|arg0| arg0.contains("companion-chat-cli"))
+        .unwrap_or(false);
+    
     if is_chat_mode(&cli) {
         // Interactive TUI Mode
         run_chat_mode(&cli);
     } else if is_cli_mode(&cli) {
         // CLI Agent Mode (single command)
         run_cli_agent(&cli);
+    } else if is_cli_binary {
+        // Invoked as companion-chat-cli without args - default to TUI
+        run_chat_mode(&cli);
     } else {
         // GUI Mode
         companion_chat_lib::run()
